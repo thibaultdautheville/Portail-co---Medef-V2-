@@ -19,9 +19,12 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 
-BASE_DIR = Path(r"c:\Users\tdautheville\Documents\Portail de l'éco")
+BASE_DIR = Path(__file__).resolve().parent
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR", BASE_DIR / "storage_excel"))
-TEMPLATES_DIR = BASE_DIR / "templates"
+TEMPLATES_DIR = Path(os.getenv("TEMPLATES_DIR", BASE_DIR / "templates"))
+MAX_POINTS_PER_TRACE = int(os.getenv("MAX_POINTS_PER_TRACE", "800"))
+
+
 
 # Vérification immédiate
 print(f"BASE_DIR     : {BASE_DIR}  → existe: {BASE_DIR.exists()}")
@@ -583,7 +586,12 @@ for rule in app.url_map.iter_rules():
 # In[ ]:
 
 
-app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=False)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("RENDER") is None
+    host = "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1"
+
+    app.run(host=host, port=port, debug=debug, use_reloader=False)
 
 
 # In[ ]:
