@@ -133,97 +133,75 @@
         </div>
         {% endfor %}
     </div>
-<script>
-const chartsData = {{ charts_data | tojson }};
-const PALETTE = [
-    "#003d7a","#1a7fc1","#f59e0b","#10b981",
-    "#ef4444","#8b5cf6","#ec4899","#6b7280",
-    "#0891b2","#d97706"
-];
 
-const indicators = Object.keys(chartsData);
+    <!-- Données JSON injectées depuis Flask/Jinja -->
+    <script>
+    // charts_data = { indicator: { ric: { x: [...], y: [...], name: "..." } } }
+    const chartsData = {{ charts_data | tojson }};
+    const yearMin    = {{ year_min }};
+    const yearMax    = {{ year_max }};
 
-indicators.forEach((ind, chartIdx) => {
+    // Palette de couleurs MEDEF-friendly
+    const PALETTE = [
+        "#003d7a","#1a7fc1","#f59e0b","#10b981",
+        "#ef4444","#8b5cf6","#ec4899","#6b7280",
+        "#0891b2","#d97706"
+    ];
 
-    // ── Traces ────────────────────────────────────────────────────────────
-    const traces = Object.values(chartsData[ind]).map((serie, i) => ({
-        type: "scatter",
-        mode: "lines",
-        name: serie.name,
-        x: serie.x,
-        y: serie.y,
-        line: { color: PALETTE[i % PALETTE.length], width: 2 },
-        connectgaps: false,
-        hovertemplate: `<b>%{fullData.name}</b><br>Année : %{x}<br>Valeur : %{y:,.2f}<extra></extra>`,
-    }));
+    // Construit et monte les graphiques Plotly
+    const indicators = Object.keys(chartsData);
+    indicators.forEach((ind, chartIdx) => {
+        const traces = Object.values(chartsData[ind]).map((serie, i) => ({
+            type: "scatter",
+            mode: "lines",
+            name: serie.name,
+            x: serie.x,
+            y: serie.y,
+            line: { color: PALETTE[i % PALETTE.length], width: 1.8 },
+            connectgaps: false   // NaN = rupture de ligne, pas d'interpolation
+        }));
 
-    // ── Layout ────────────────────────────────────────────────────────────
-    const layout = {
-    paper_bgcolor: "#f7f9fc",
-    plot_bgcolor:  "#ffffff",
-    margin: { t: 50, r: 30, b: 40, l: 55 },  // b réduit : plus de rangeslider
+        const layout = {
+            xaxis: {
+                title: { text: "Année", font: { size: 12 } },
+                range: [yearMin, yearMax],   // ← synchronisé avec les sliders
+                showgrid: true, gridcolor: "#eef2f7"
+            },
+            yaxis: {
+                title: { text: ind, font: { size: 11 }, standoff: 10 },
+                showgrid: true, gridcolor: "#eef2f7", zeroline: true,
+                zerolinecolor: "#9ca3af", zerolinewidth: 1
+            },
+            legend: { orientation: "h", y: -0.22 },
+            margin: { l: 70, r: 20, t: 20, b: 80 },
+            plot_bgcolor: "white", paper_bgcolor: "white",
+            hovermode: "x unified"
+        };
 
-    // ── Titre de l'indicateur en annotation (plus propre que yaxis.title) ──
-    annotations: [{
-        text: ind,                          // nom complet de l'indicateur
-        xref: "paper", yref: "paper",
-        x: 0, y: 1.06,                     // au-dessus du graphique, calé à gauche
-        xanchor: "left", yanchor: "bottom",
-        font: { size: 11, color: "#4a5a73" },
-        showarrow: false,
-    }],
-
-    // ── Axe X : pas de titre, juste les années ────────────────────────────
-    xaxis: {
-        title:    null,                     // supprimé
-        showgrid: true, gridcolor: "#e8edf4", gridwidth: 1,
-        zeroline: false,
-        tickfont: { size: 11, color: "#4a5a73" },
-        rangeslider: { visible: false },    // supprimé — c'était le cartouche gris
-    },
-
-    // ── Axe Y : pas de titre long vertical ───────────────────────────────
-    yaxis: {
-        title:      null,                   // supprimé, remplacé par annotation
-        showgrid:   true, gridcolor: "#e8edf4", gridwidth: 1,
-        zeroline:   true, zerolinecolor: "#c0cce0", zerolinewidth: 1.5,
-        tickfont:   { size: 11, color: "#4a5a73" },
-        automargin: true,
-    },
-
-    // ── Légende cliquable (natif Plotly) ──────────────────────────────────
-    legend: {
-        orientation: "h", x: 0.5, xanchor: "center", y: -0.08,
-        font: { size: 11 },
-        bgcolor: "rgba(247,249,252,0)",     // transparent — fond uni = propre
-        borderwidth: 0,
-    },
-
-    hovermode: "x unified",
-    hoverlabel: { bgcolor: "#003d7a", font: { color: "#fff", size: 12 } },
-};
-
-    // ── APPEL MANQUANT — c'était ton bug ──────────────────────────────────
-    Plotly.newPlot(`chart_${chartIdx + 1}`, traces, layout, { responsive: true });
-
-});
-
-function updateSliders() {
-    const yStart = parseInt(document.getElementById('year_start').value);
-    const yEnd   = parseInt(document.getElementById('year_end').value);
-
-    // Empêche start > end
-    if (yStart > yEnd) document.getElementById('year_end').value = yStart;
-
-    document.getElementById('start_val').textContent = yStart;
-    document.getElementById('end_val').textContent   = Math.max(yStart, yEnd);
-
-    indicators.forEach((_, i) => {
-        Plotly.relayout(`chart_${i + 1}`, { 'xaxis.range': [yStart, Math.max(yStart, yEnd)] });
+        Plotly.newPlot(`chart_${chartIdx + 1}`, traces, layout, { responsive: true });
     });
-}
-</script>
 
-    
+    // ── Mise à jour temps réel des graphiques quand slider bouge ──────────
+    function updateSliders() {
+        const s = document.getElementById('year_start');
+        const e = document.getElementById('year_end');
+        // Empêche start > end
+        if (parseInt(s.value) > parseInt(e.value)) {
+            e.value = s.value;
+        }
+        document.getElementById('start_val').textContent = s.value;
+        document.getElementById('end_val').textContent   = e.value;
+
+        const yStart = parseInt(s.value);
+        const yEnd   = parseInt(e.value);
+
+        // Relayout sur tous les graphiques pour mettre à jour l'axe X
+        indicators.forEach((_, chartIdx) => {
+            Plotly.relayout(`chart_${chartIdx + 1}`, {
+                'xaxis.range': [yStart, yEnd]
+            });
+        });
+    }
+    </script>
 </body>
 </html>
