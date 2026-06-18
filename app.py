@@ -307,22 +307,30 @@ def build_excel_export(selections: list[dict], year_start: int, year_end: int) -
 
             data.to_excel(writer, sheet_name=data_sheet, index=False)
 
-            meta_out = meta.copy() if not meta.empty else pd.DataFrame(
-                {"Champ": ["(metadata source absente)"]}
-            )
-            extra = pd.DataFrame({
-                "Champ":  ["Fenêtre temporelle appliquée", "Fréquence native", "Date export"],
-                "Valeur": [f"{year_start} – {year_end}",
-                           FREQ_FR.get(freq, freq),
-                           datetime.now().strftime("%Y-%m-%d %H:%M")],
-            })
-            if not meta.empty:
-                meta_out = pd.concat(
-                    [meta_out, pd.DataFrame([{c: "" for c in meta.columns}]), extra],
-                    ignore_index=True
-                )
-            else:
-                meta_out = extra
+            # Filtre META sur les RIC sélectionnés uniquement
+if not meta.empty and "RIC" in meta.columns:
+    meta_out = meta[meta["RIC"].astype(str).str.strip().isin(countries)].copy()
+    if meta_out.empty:
+        meta_out = pd.DataFrame({"Champ": ["(aucun RIC correspondant en metadata)"]})
+else:
+    meta_out = pd.DataFrame({"Champ": ["(metadata source absente)"]})
+
+extra = pd.DataFrame({
+    "Champ":  ["Fenêtre temporelle appliquée", "Fréquence native", "Date export"],
+    "Valeur": [f"{year_start} – {year_end}",
+               FREQ_FR.get(freq, freq),
+               datetime.now().strftime("%Y-%m-%d %H:%M")],
+})
+if not meta.empty and "RIC" in meta.columns:
+    meta_out = pd.concat(
+        [meta_out, pd.DataFrame([{c: "" for c in meta.columns}]), extra],
+        ignore_index=True
+    )
+else:
+    meta_out = extra
+
+meta_out.to_excel(writer, sheet_name=meta_sheet, index=False)
+
 
             meta_out.to_excel(writer, sheet_name=meta_sheet, index=False)
 
